@@ -1,0 +1,1458 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Protótipo de Proteção Patrimonial RFID</title>
+
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+  <script src="./firebase-config.js"></script>
+
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      background: linear-gradient(135deg, #0f172a, #1d4ed8);
+      min-height: 100vh;
+      color: #0f172a;
+      padding: 20px;
+    }
+    .container { max-width: 1240px; margin: 0 auto; }
+    .panel {
+      background: rgba(255,255,255,0.98);
+      border-radius: 22px;
+      overflow: hidden;
+      box-shadow: 0 18px 50px rgba(0,0,0,.28);
+    }
+    .hero {
+      background: linear-gradient(135deg, #0f172a, #334155);
+      color: #fff;
+      padding: 28px;
+    }
+    .hero h1 { font-size: 30px; margin-bottom: 6px; }
+    .hero p { opacity: .92; }
+    .content { padding: 22px; }
+    .hidden { display: none !important; }
+    .grid { display: grid; gap: 16px; }
+    .grid-2 { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+    .grid-3 { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+    .grid-4 { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+
+    .card {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 18px;
+      padding: 18px;
+    }
+    .card h3 {
+      margin-bottom: 14px;
+      color: #0f172a;
+      font-size: 18px;
+    }
+    .muted { color: #64748b; font-size: 14px; }
+
+    .field { margin-bottom: 14px; }
+    .field label {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 14px;
+      font-weight: 700;
+      color: #334155;
+    }
+    .field input, .field textarea, .field select {
+      width: 100%;
+      padding: 12px 14px;
+      border: 1px solid #cbd5e1;
+      border-radius: 12px;
+      font-size: 15px;
+      outline: none;
+      font-family: inherit;
+      background: white;
+    }
+    .field textarea { min-height: 90px; resize: vertical; }
+    .field input:focus, .field textarea:focus, .field select:focus {
+      border-color: #2563eb;
+      box-shadow: 0 0 0 3px rgba(37,99,235,.12);
+    }
+    .asset-image-preview {
+      width: 100%;
+      max-height: 220px;
+      object-fit: cover;
+      border-radius: 12px;
+      border: 1px solid #cbd5e1;
+      margin-top: 10px;
+      background: #e2e8f0;
+    }
+    .asset-image-preview-small {
+      max-height: 130px;
+      object-fit: contain;
+      background: #f8fafc;
+    }
+    .photo-view-image {
+      width: 100%;
+      max-height: 420px;
+      object-fit: contain;
+      border-radius: 14px;
+      border: 1px solid #cbd5e1;
+      background: #f8fafc;
+      margin-top: 10px;
+    }
+    .table-thumb {
+      width: 58px;
+      height: 58px;
+      object-fit: cover;
+      border-radius: 8px;
+      border: 1px solid #cbd5e1;
+      background: #f1f5f9;
+      display: block;
+    }
+    .auth-grid {
+      align-items: stretch;
+      gap: 20px;
+    }
+    .auth-card {
+      box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+      border-radius: 20px;
+    }
+    .auth-card h3 {
+      font-size: 22px;
+      margin-bottom: 18px;
+    }
+    .brand-card {
+      background: linear-gradient(160deg, #eff6ff, #f8fafc 55%, #dbeafe);
+      border: 1px solid #bfdbfe;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      text-align: center;
+      min-height: 100%;
+      box-shadow: 0 10px 26px rgba(30, 64, 175, 0.14);
+    }
+    .logo-frame {
+      position: relative;
+      width: 100%;
+      max-width: 420px;
+      margin: 0 auto 16px;
+      padding: 10px;
+      border-radius: 24px;
+      background: linear-gradient(135deg, #1d4ed8, #22d3ee, #1e3a8a);
+      box-shadow: 0 16px 36px rgba(29, 78, 216, 0.28);
+      overflow: hidden;
+    }
+    .logo-frame::after {
+      content: "";
+      position: absolute;
+      inset: 2px;
+      border-radius: 22px;
+      background: rgba(255, 255, 255, 0.92);
+      z-index: 0;
+    }
+    .welcome-logo {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      max-width: 100%;
+      margin: 0;
+      display: block;
+      border-radius: 16px;
+      border: 1px solid #bfdbfe;
+      box-shadow: 0 10px 24px rgba(15, 23, 42, 0.16);
+    }
+    .brand-title {
+      font-size: 22px;
+      font-weight: 800;
+      color: #0f172a;
+      margin-bottom: 8px;
+    }
+    .brand-subtitle {
+      color: #334155;
+      line-height: 1.5;
+      max-width: 420px;
+      margin: 0 auto;
+    }
+    .auth-actions .btn-primary {
+      min-width: 130px;
+    }
+    .auth-actions .btn-secondary {
+      background: #dbeafe;
+      color: #1e3a8a;
+    }
+    @media (max-width: 768px) {
+      .brand-card {
+        border-radius: 22px;
+        padding: 14px;
+      }
+      .logo-frame {
+        max-width: 320px;
+        border-radius: 20px;
+        padding: 8px;
+        box-shadow: 0 12px 28px rgba(29, 78, 216, 0.28);
+      }
+      .logo-frame::after {
+        border-radius: 18px;
+      }
+      .welcome-logo {
+        border-radius: 12px;
+      }
+      .asset-image-preview-small {
+        max-height: 110px;
+      }
+      .photo-view-image {
+        max-height: 300px;
+      }
+      .brand-title {
+        font-size: 20px;
+      }
+      .brand-subtitle {
+        font-size: 13px;
+      }
+    }
+
+    .row { display: flex; gap: 10px; flex-wrap: wrap; }
+    button {
+      border: none;
+      border-radius: 12px;
+      padding: 12px 16px;
+      cursor: pointer;
+      font-size: 15px;
+      font-weight: 700;
+    }
+    .btn-primary { background: #2563eb; color: white; }
+    .btn-secondary { background: #e2e8f0; color: #0f172a; }
+    .btn-success { background: #16a34a; color: white; }
+    .btn-danger { background: #dc2626; color: white; }
+    .btn-warning { background: #f59e0b; color: white; }
+    .btn-edit {
+      background: #0ea5e9;
+      color: white;
+    }
+    .btn-small {
+      padding: 8px 12px;
+      font-size: 13px;
+      border-radius: 10px;
+      white-space: nowrap;
+    }
+    .edit-card {
+      border: 1px solid #7dd3fc;
+      background: linear-gradient(180deg, #f0f9ff, #f8fafc);
+    }
+
+    .nav { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+    .nav button.active { background: #2563eb; color: white; }
+
+    .stats {
+      display: grid;
+      gap: 16px;
+      grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+      margin-bottom: 16px;
+    }
+    .stat {
+      background: linear-gradient(135deg, #1d4ed8, #3b82f6);
+      color: white;
+      border-radius: 18px;
+      padding: 18px;
+    }
+    .stat .label { font-size: 13px; opacity: .92; margin-bottom: 10px; }
+    .stat .value { font-size: 30px; font-weight: 800; }
+
+    .tag {
+      display: inline-block;
+      border-radius: 999px;
+      padding: 6px 12px;
+      font-size: 12px;
+      font-weight: 800;
+    }
+    .tag-green { background: #dcfce7; color: #166534; }
+    .tag-red { background: #fee2e2; color: #991b1b; }
+    .tag-blue { background: #dbeafe; color: #1d4ed8; }
+    .tag-gray { background: #e2e8f0; color: #334155; }
+    .tag-yellow { background: #fef3c7; color: #92400e; }
+
+    .table-wrap {
+      overflow-x: auto;
+      border: 1px solid #e2e8f0;
+      background: white;
+      border-radius: 16px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 900px;
+    }
+    th, td {
+      padding: 12px 14px;
+      border-bottom: 1px solid #e2e8f0;
+      text-align: left;
+      font-size: 14px;
+      vertical-align: top;
+    }
+    th {
+      background: #f1f5f9;
+      color: #0f172a;
+    }
+
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      color: white;
+      padding: 14px 16px;
+      border-radius: 12px;
+      display: none;
+      z-index: 9999;
+      max-width: 360px;
+      box-shadow: 0 14px 30px rgba(0,0,0,.25);
+    }
+    .toast.show { display: block; }
+    .toast.success { background: #16a34a; }
+    .toast.error { background: #dc2626; }
+
+    .warn-box {
+      background: #fff7ed;
+      border: 1px solid #fdba74;
+      color: #9a3412;
+      padding: 14px;
+      border-radius: 14px;
+      margin-bottom: 16px;
+      line-height: 1.5;
+    }
+
+    .monitor-highlight {
+      font-size: 36px;
+      font-weight: 800;
+      margin-bottom: 10px;
+    }
+
+    .empty {
+      padding: 18px;
+      text-align: center;
+      color: #64748b;
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <div id="authScreen" class="panel">
+    <div class="hero">
+      <h1>Proteção Patrimonial com RFID</h1>
+      <p>Login, cadastro de usuários, cadastro de patrimônio, identificação por tag e confirmação de entrada/saída.</p>
+    </div>
+    <div class="content">
+      <div class="grid grid-2 auth-grid">
+        <div class="card auth-card">
+          <h3>Entrar</h3>
+          <div class="field">
+            <label for="loginEmail">E-mail</label>
+            <input id="loginEmail" type="email" placeholder="seuemail@exemplo.com">
+          </div>
+          <div class="field">
+            <label for="loginPassword">Senha</label>
+            <input id="loginPassword" type="password" placeholder="Sua senha">
+          </div>
+          <div class="row auth-actions">
+            <button class="btn-primary" onclick="login()">Entrar</button>
+            <button class="btn-secondary" onclick="toggleRegister(true)">Criar conta</button>
+          </div>
+        </div>
+
+        <div class="card auth-card hidden" id="registerCard">
+          <h3>Criar conta</h3>
+          <div class="field">
+            <label for="registerName">Nome completo</label>
+            <input id="registerName" type="text" placeholder="Seu nome">
+          </div>
+          <div class="field">
+            <label for="registerEmail">E-mail</label>
+            <input id="registerEmail" type="email" placeholder="seuemail@exemplo.com">
+          </div>
+          <div class="field">
+            <label for="registerPassword">Senha</label>
+            <input id="registerPassword" type="password" placeholder="Crie uma senha">
+          </div>
+          <div class="row auth-actions">
+            <button class="btn-primary" onclick="registerUser()">Cadastrar</button>
+            <button class="btn-secondary" onclick="toggleRegister(false)">Cancelar</button>
+          </div>
+        </div>
+
+        <div class="card brand-card">
+          <div class="logo-frame">
+            <img
+              class="welcome-logo"
+              src="www/assets/logo.png"
+              alt="Logo Proteção Patrimonial RFID"
+            >
+          </div>
+          <p class="brand-title">Bem-vindo ao sistema</p>
+          <p class="brand-subtitle">Acompanhe patrimônio com leitura RFID, controle de movimentações e cadastro simplificado em uma única plataforma.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="appScreen" class="panel hidden">
+    <div class="hero">
+      <div class="topbar">
+        <div>
+          <h1>Painel Patrimonial RFID</h1>
+          <p>Usuário logado: <strong id="currentUserName">--</strong> | Tag: <strong id="currentUserTag">--</strong></p>
+        </div>
+        <button class="btn-danger" onclick="logout()">Sair</button>
+      </div>
+      <div class="nav">
+        <button class="btn-secondary active" id="tabButtonDashboard" onclick="showTab('tabDashboard', 'tabButtonDashboard')">Dashboard</button>
+        <button class="btn-secondary" id="tabButtonPatrimonios" onclick="showTab('tabPatrimonios', 'tabButtonPatrimonios')">Patrimônios</button>
+        <button class="btn-secondary" id="tabButtonMovimentacao" onclick="showTab('tabMovimentacao', 'tabButtonMovimentacao')">Movimentação</button>
+        <button class="btn-secondary" id="tabButtonHistorico" onclick="showTab('tabHistorico', 'tabButtonHistorico')">Histórico</button>
+        <button class="btn-secondary hidden" id="tabButtonEditarPatrimonio" onclick="showTab('tabEditarPatrimonio', 'tabButtonEditarPatrimonio')">Editar patrimônio</button>
+        <button class="btn-secondary hidden" id="tabButtonFotoPatrimonio" onclick="showTab('tabFotoPatrimonio', 'tabButtonFotoPatrimonio')">FOTO/DETALHES</button>
+      </div>
+    </div>
+
+    <div class="content">
+      <div id="tabDashboard" class="tab">
+        <div class="stats">
+          <div class="stat">
+            <div class="label">Patrimônios cadastrados</div>
+            <div class="value" id="statPatrimonios">0</div>
+          </div>
+          <div class="stat">
+            <div class="label">Movimentações hoje</div>
+            <div class="value" id="statHoje">0</div>
+          </div>
+          <div class="stat">
+            <div class="label">Último patrimônio lido</div>
+            <div class="value" id="statUltimoPatrimonio" style="font-size:20px;">--</div>
+          </div>
+          <div class="stat">
+            <div class="label">Última ação</div>
+            <div class="value" id="statUltimaAcao" style="font-size:20px;">--</div>
+          </div>
+        </div>
+
+        <div class="grid grid-2">
+          <div class="card">
+            <h3>Última leitura recebida do ESP32</h3>
+            <p><strong>UID lida:</strong> <span id="dashUid">--</span></p>
+            <p><strong>Nome bruto retornado:</strong> <span id="dashNomeBruto">--</span></p>
+            <p><strong>Distância:</strong> <span id="dashDistancia">--</span></p>
+            <p><strong>Horário:</strong> <span id="dashHorario">--</span></p>
+            <p><strong>Patrimônio identificado:</strong> <span id="dashPatrimonio">--</span></p>
+          </div>
+
+          <div class="card">
+            <h3>Resumo do fluxo</h3>
+            <p class="muted">
+              Quando o ESP32 envia uma tag para <strong>leituras_recentes</strong>, o sistema procura essa UID em
+              <strong>tags_patrimonio</strong>. Se encontrar um patrimônio, o operador escolhe no software se o objeto está
+              <strong>entrando</strong> ou <strong>saindo</strong>.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div id="tabPatrimonios" class="tab hidden">
+        <div class="grid grid-2">
+          <div class="card">
+            <h3>Cadastrar patrimônio</h3>
+            <div class="field">
+              <label for="assetCode">Código do patrimônio</label>
+              <input id="assetCode" type="text" placeholder="Ex: PAT-001">
+            </div>
+            <div class="field">
+              <label for="assetName">Nome do objeto</label>
+              <input id="assetName" type="text" placeholder="Ex: Mesa da sala 01">
+            </div>
+            <div class="field">
+              <label for="assetCategory">Categoria</label>
+              <input id="assetCategory" type="text" placeholder="Ex: Mobiliário">
+            </div>
+            <div class="field">
+              <label for="assetTag">Tag RFID do objeto</label>
+              <input id="assetTag" type="text" placeholder="Ex: A1 B2 C3 D4">
+            </div>
+            <div class="field">
+              <label for="assetLocation">Localização padrão</label>
+              <input id="assetLocation" type="text" placeholder="Ex: Sala 01">
+            </div>
+            <div class="field">
+              <label for="assetDescription">Descrição</label>
+              <textarea id="assetDescription" placeholder="Descreva o bem patrimonial"></textarea>
+            </div>
+            <div class="field">
+              <label for="assetImageInput">Foto do patrimônio (câmera do celular)</label>
+              <input id="assetImageInput" type="file" accept="image/*" capture="environment" onchange="handleAssetImageChange(event)">
+              <p class="muted" style="margin-top:6px;">No celular, esse campo abre a câmera para fotografar o patrimônio.</p>
+              <img id="assetImagePreview" class="asset-image-preview hidden" alt="Pré-visualização da foto do patrimônio">
+            </div>
+            <div class="row">
+              <button class="btn-primary" onclick="saveAsset()">Salvar patrimônio</button>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3>Patrimônios cadastrados</h3>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Código</th>
+                    <th>Objeto</th>
+                    <th>Tag RFID</th>
+                    <th>Foto</th>
+                    <th>Status atual</th>
+                    <th>Localização</th>
+                    <th>Ações</th>
+                  </tr>
+                </thead>
+                <tbody id="assetsTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="tabMovimentacao" class="tab hidden">
+        <div class="grid grid-2">
+          <div class="card">
+            <h3>Leitura pendente</h3>
+            <div class="monitor-highlight"><span id="movementUid">--</span></div>
+            <p><strong>Patrimônio:</strong> <span id="movementAssetName">Nenhum patrimônio identificado</span></p>
+            <p><strong>Código:</strong> <span id="movementAssetCode">--</span></p>
+            <p><strong>Distância:</strong> <span id="movementDistance">--</span></p>
+            <p><strong>Horário:</strong> <span id="movementTime">--</span></p>
+            <p><strong>Status do patrimônio:</strong> <span id="movementCurrentStatus">--</span></p>
+            <p style="margin-top: 12px;"><strong>Última confirmação:</strong> <span id="movementProcessed">Aguardando</span></p>
+          </div>
+
+          <div class="card">
+            <h3>Confirmar movimentação</h3>
+            <p class="muted" style="margin-bottom: 16px;">
+              Quando a tag do patrimônio for lida, escolha se o objeto está entrando ou saindo do recinto.
+            </p>
+            <div class="row">
+              <button class="btn-success" onclick="confirmMovement('entrada')">Objeto entrando</button>
+              <button class="btn-warning" onclick="confirmMovement('saida')">Objeto saindo</button>
+            </div>
+            <p class="muted" style="margin-top: 14px;">
+              A confirmação grava um registro em <strong>movimentacoes</strong> e atualiza o status do patrimônio.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div id="tabHistorico" class="tab hidden">
+        <div class="card">
+          <h3>Histórico de movimentações</h3>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Data/Hora</th>
+                  <th>Tipo</th>
+                  <th>Patrimônio</th>
+                  <th>UID</th>
+                  <th>Confirmado por</th>
+                  <th>Localização</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
+              <tbody id="historyTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div id="tabEditarPatrimonio" class="tab hidden">
+        <div class="card edit-card" id="editAssetCard">
+          <h3>Editar patrimônio</h3>
+          <p class="muted" id="editAssetContext" style="margin-bottom: 12px;">Selecione um patrimônio para editar.</p>
+          <div class="field">
+            <label for="editAssetCode">Código do patrimônio</label>
+            <input id="editAssetCode" type="text" placeholder="Ex: PAT-001">
+          </div>
+          <div class="field">
+            <label for="editAssetName">Nome do objeto</label>
+            <input id="editAssetName" type="text" placeholder="Ex: Mesa da sala 01">
+          </div>
+          <div class="field">
+            <label for="editAssetCategory">Categoria</label>
+            <input id="editAssetCategory" type="text" placeholder="Ex: Mobiliário">
+          </div>
+          <div class="field">
+            <label for="editAssetTag">Tag RFID do objeto</label>
+            <input id="editAssetTag" type="text" placeholder="Ex: A1 B2 C3 D4">
+          </div>
+          <div class="field">
+            <label for="editAssetLocation">Localização padrão</label>
+            <input id="editAssetLocation" type="text" placeholder="Ex: Sala 01">
+          </div>
+          <div class="field">
+            <label for="editAssetDescription">Descrição</label>
+            <textarea id="editAssetDescription" placeholder="Descreva o bem patrimonial"></textarea>
+          </div>
+          <div class="field">
+            <label for="editAssetImageInput">Foto do patrimônio (câmera do celular)</label>
+            <input id="editAssetImageInput" type="file" accept="image/*" capture="environment" onchange="handleEditAssetImageChange(event)">
+            <p class="muted" style="margin-top:6px;">Opcional: selecione uma nova foto para substituir a atual.</p>
+            <div class="row" style="margin-top: 8px;">
+              <button class="btn-secondary btn-small" type="button" onclick="openEditAssetImage()">FOTO/DETALHES</button>
+            </div>
+            <img id="editAssetImagePreview" class="asset-image-preview asset-image-preview-small hidden" alt="Pré-visualização da foto do patrimônio em edição">
+          </div>
+          <div class="row">
+            <button class="btn-primary" onclick="saveEditedAsset()">Atualizar patrimônio</button>
+            <button class="btn-secondary" onclick="cancelEditAsset()">Cancelar edição</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="tabFotoPatrimonio" class="tab hidden">
+        <div class="card">
+          <h3>FOTO/DETALHES</h3>
+          <p class="muted" id="photoViewTitle">Selecione um patrimônio na edição para visualizar os detalhes da foto.</p>
+          <img id="photoViewImage" class="photo-view-image hidden" alt="Foto ampliada do patrimônio">
+          <div style="margin-top: 14px; line-height: 1.8;">
+            <p><strong>Código:</strong> <span id="photoViewCode">--</span></p>
+            <p><strong>Nome:</strong> <span id="photoViewName">--</span></p>
+            <p><strong>Categoria:</strong> <span id="photoViewCategory">--</span></p>
+            <p><strong>Tag RFID:</strong> <span id="photoViewTag">--</span></p>
+            <p><strong>Localização padrão:</strong> <span id="photoViewLocation">--</span></p>
+            <p><strong>Descrição:</strong> <span id="photoViewDescription">--</span></p>
+          </div>
+          <div class="row" style="margin-top: 14px;">
+            <button class="btn-secondary" type="button" onclick="goBackToEditAssetTab()">Voltar para edição</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+  function isFirebaseConfigValid(config) {
+    if (!config) return false;
+    return Boolean(
+      config.apiKey &&
+      config.authDomain &&
+      config.databaseURL &&
+      config.projectId &&
+      config.appId
+    );
+  }
+
+  const firebaseConfig = window.firebaseConfig;
+  if (!isFirebaseConfigValid(firebaseConfig)) {
+    alert("Firebase nao configurado. Preencha o arquivo firebase-config.js.");
+    throw new Error("Firebase config ausente ou invalida.");
+  }
+
+  firebase.initializeApp(firebaseConfig);
+  const auth = firebase.auth();
+  const database = firebase.database();
+
+  let currentUserProfile = null;
+  let latestReading = null;
+  let latestReadingKey = null;
+  let latestAssetResolved = null;
+  let listenersStarted = false;
+  let editingAssetId = null;
+  let editingAssetOriginalUid = "";
+  let editingAssetCurrentPhoto = "";
+  let photoViewerData = null;
+
+  function showToast(message, type = "success") {
+    const toast = document.getElementById("toast");
+    toast.textContent = message;
+    toast.className = `toast show ${type}`;
+    setTimeout(() => { toast.className = "toast"; }, 3000);
+  }
+
+  function toggleRegister(show) {
+    document.getElementById("registerCard").classList.toggle("hidden", !show);
+  }
+
+  function normalizeUid(uid) {
+    return (uid || "").toUpperCase().trim().split(/\s+/).filter(Boolean).join(" ");
+  }
+
+  function uidToKey(uid) {
+    return normalizeUid(uid).replace(/[^A-F0-9]/g, "");
+  }
+
+  function formatTimestamp(seconds) {
+    if (!seconds) return "--";
+    return new Date(seconds * 1000).toLocaleString("pt-BR");
+  }
+
+  function showTab(tabId, buttonId) {
+    if (tabId === "tabEditarPatrimonio" && !editingAssetId) {
+      showToast("Abra a edição pelo botão Editar de um patrimônio.", "error");
+      return;
+    }
+    if (tabId === "tabFotoPatrimonio" && (!photoViewerData || !photoViewerData.imageUrl)) {
+      showToast("Selecione um patrimônio com foto para visualizar.", "error");
+      return;
+    }
+    document.querySelectorAll(".tab").forEach(tab => tab.classList.add("hidden"));
+    document.getElementById(tabId).classList.remove("hidden");
+    document.querySelectorAll(".nav button").forEach(btn => btn.classList.remove("active"));
+    document.getElementById(buttonId).classList.add("active");
+  }
+
+  function showApp(profile) {
+    currentUserProfile = profile;
+    document.getElementById("authScreen").classList.add("hidden");
+    document.getElementById("appScreen").classList.remove("hidden");
+    document.getElementById("currentUserName").textContent = profile.nome || "--";
+    document.getElementById("currentUserTag").textContent = profile.uid_cartao || "--";
+
+    if (!listenersStarted) {
+      startRealtimeListeners();
+      listenersStarted = true;
+    }
+  }
+
+  function showAuth() {
+    document.getElementById("appScreen").classList.add("hidden");
+    document.getElementById("authScreen").classList.remove("hidden");
+  }
+
+  function handleAssetImageChange(event) {
+    const file = event?.target?.files?.[0];
+    const preview = document.getElementById("assetImagePreview");
+    if (!file) {
+      preview.src = "";
+      preview.classList.add("hidden");
+      return;
+    }
+
+    const objectUrl = URL.createObjectURL(file);
+    preview.src = objectUrl;
+    preview.classList.remove("hidden");
+  }
+
+  function handleEditAssetImageChange(event) {
+    const file = event?.target?.files?.[0];
+    const preview = document.getElementById("editAssetImagePreview");
+    if (!file) {
+      if (editingAssetCurrentPhoto) {
+        preview.src = editingAssetCurrentPhoto;
+        preview.classList.remove("hidden");
+      } else {
+        preview.src = "";
+        preview.classList.add("hidden");
+      }
+      return;
+    }
+
+    const objectUrl = URL.createObjectURL(file);
+    preview.src = objectUrl;
+    preview.classList.remove("hidden");
+  }
+
+  function openEditAssetImage() {
+    const preview = document.getElementById("editAssetImagePreview");
+    const imageUrl =
+      preview && !preview.classList.contains("hidden") && preview.src
+        ? preview.src
+        : editingAssetCurrentPhoto;
+
+    if (!imageUrl) {
+      showToast("Este patrimônio não possui foto para abrir.", "error");
+      return;
+    }
+    photoViewerData = {
+      imageUrl,
+      codigo: document.getElementById("editAssetCode").value.trim() || "--",
+      nome: document.getElementById("editAssetName").value.trim() || "--",
+      categoria: document.getElementById("editAssetCategory").value.trim() || "--",
+      uidTag: document.getElementById("editAssetTag").value.trim() || "--",
+      localizacao: document.getElementById("editAssetLocation").value.trim() || "--",
+      descricao: document.getElementById("editAssetDescription").value.trim() || "--"
+    };
+    populatePhotoView(photoViewerData);
+    showTab("tabFotoPatrimonio", "tabButtonFotoPatrimonio");
+  }
+
+  function populatePhotoView(data) {
+    const image = document.getElementById("photoViewImage");
+    if (data.imageUrl) {
+      image.src = data.imageUrl;
+      image.classList.remove("hidden");
+    } else {
+      image.src = "";
+      image.classList.add("hidden");
+    }
+    document.getElementById("photoViewTitle").textContent = `FOTO/DETALHES: ${data.nome || "--"} (${data.codigo || "--"})`;
+    document.getElementById("photoViewCode").textContent = data.codigo || "--";
+    document.getElementById("photoViewName").textContent = data.nome || "--";
+    document.getElementById("photoViewCategory").textContent = data.categoria || "--";
+    document.getElementById("photoViewTag").textContent = data.uidTag || "--";
+    document.getElementById("photoViewLocation").textContent = data.localizacao || "--";
+    document.getElementById("photoViewDescription").textContent = data.descricao || "--";
+  }
+
+  function clearPhotoView() {
+    photoViewerData = null;
+    const image = document.getElementById("photoViewImage");
+    image.src = "";
+    image.classList.add("hidden");
+    document.getElementById("photoViewTitle").textContent = "Selecione um patrimônio na edição para visualizar os detalhes da foto.";
+    document.getElementById("photoViewCode").textContent = "--";
+    document.getElementById("photoViewName").textContent = "--";
+    document.getElementById("photoViewCategory").textContent = "--";
+    document.getElementById("photoViewTag").textContent = "--";
+    document.getElementById("photoViewLocation").textContent = "--";
+    document.getElementById("photoViewDescription").textContent = "--";
+  }
+
+  function goBackToEditAssetTab() {
+    showTab("tabEditarPatrimonio", "tabButtonEditarPatrimonio");
+  }
+
+  async function fileToCompressedBase64(file, maxWidth = 800, quality = 0.72) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const image = new Image();
+        image.onload = () => {
+          const ratio = image.width > maxWidth ? maxWidth / image.width : 1;
+          const targetWidth = Math.max(1, Math.round(image.width * ratio));
+          const targetHeight = Math.max(1, Math.round(image.height * ratio));
+          const canvas = document.createElement("canvas");
+          canvas.width = targetWidth;
+          canvas.height = targetHeight;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) {
+            reject(new Error("Nao foi possivel processar a imagem."));
+            return;
+          }
+          ctx.drawImage(image, 0, 0, targetWidth, targetHeight);
+          const dataUrl = canvas.toDataURL("image/jpeg", quality);
+          resolve(dataUrl);
+        };
+        image.onerror = () => reject(new Error("Arquivo de imagem invalido."));
+        image.src = String(reader.result || "");
+      };
+      reader.onerror = () => reject(new Error("Falha ao ler a imagem."));
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function login() {
+    const email = document.getElementById("loginEmail").value.trim();
+    const password = document.getElementById("loginPassword").value;
+
+    if (!email || !password) {
+      showToast("Preencha e-mail e senha.", "error");
+      return;
+    }
+
+    try {
+      const credential = await auth.signInWithEmailAndPassword(email, password);
+      const user = credential.user;
+      const snap = await database.ref(`usuarios_sistema/${user.uid}`).once("value");
+
+      if (!snap.exists()) {
+        await auth.signOut();
+        showToast("Usuário autenticado, mas não cadastrado no sistema.", "error");
+        return;
+      }
+
+      const profile = snap.val();
+      showApp(profile);
+      showToast("Login realizado com sucesso.");
+    } catch (error) {
+      showToast("Erro ao fazer login: " + error.message, "error");
+    }
+  }
+
+  async function registerUser() {
+    const nome = document.getElementById("registerName").value.trim();
+    const email = document.getElementById("registerEmail").value.trim();
+    const password = document.getElementById("registerPassword").value;
+
+    if (!nome || !email || !password) {
+      showToast("Para este projeto, nome, e-mail e senha são obrigatórios.", "error");
+      return;
+    }
+
+    try {
+      const credential = await auth.createUserWithEmailAndPassword(email, password);
+      const user = credential.user;
+
+      await database.ref(`usuarios_sistema/${user.uid}`).set({
+        nome,
+        email,
+        criado_em: new Date().toISOString()
+      });
+
+      document.getElementById("registerName").value = "";
+      document.getElementById("registerEmail").value = "";
+      document.getElementById("registerPassword").value = "";
+
+      toggleRegister(false);
+      showToast("Cadastro realizado com sucesso.");
+    } catch (error) {
+      showToast("Erro ao cadastrar: " + error.message, "error");
+    }
+  }
+
+  async function logout() {
+    await auth.signOut();
+    currentUserProfile = null;
+    latestReading = null;
+    latestReadingKey = null;
+    latestAssetResolved = null;
+    showAuth();
+    showToast("Logout realizado.");
+  }
+
+  async function saveAsset() {
+    const codigo = document.getElementById("assetCode").value.trim();
+    const nome = document.getElementById("assetName").value.trim();
+    const categoria = document.getElementById("assetCategory").value.trim();
+    const uidTag = normalizeUid(document.getElementById("assetTag").value);
+    const uidTagKey = uidToKey(uidTag);
+    const localizacao = document.getElementById("assetLocation").value.trim();
+    const descricao = document.getElementById("assetDescription").value.trim();
+    const imageInput = document.getElementById("assetImageInput");
+    const imageFile = imageInput.files && imageInput.files[0] ? imageInput.files[0] : null;
+
+    if (!codigo || !nome || !uidTag || !uidTagKey || !localizacao) {
+      showToast("Preencha código, nome do objeto, tag RFID e localização.", "error");
+      return;
+    }
+
+    try {
+      const patrimonioRef = database.ref("patrimonios").push();
+      const patrimonioId = patrimonioRef.key;
+      let fotoBase64 = "";
+
+      if (imageFile) {
+        fotoBase64 = await fileToCompressedBase64(imageFile);
+      }
+
+      const payload = {
+        id: patrimonioId,
+        codigo,
+        nome,
+        categoria: categoria || "",
+        uid_tag: uidTag,
+        localizacao_padrao: localizacao,
+        localizacao_atual: localizacao,
+        descricao: descricao || "",
+        foto_base64: fotoBase64,
+        status_atual: "dentro",
+        criado_por: auth.currentUser ? auth.currentUser.uid : null,
+        criado_em: new Date().toISOString()
+      };
+
+      await patrimonioRef.set(payload);
+
+      const assetTagPayload = {
+        patrimonio_id: patrimonioId,
+        patrimonio_nome: nome,
+        patrimonio_codigo: codigo,
+        patrimonio_foto_base64: fotoBase64,
+        uid_original: uidTag,
+        uid_key: uidTagKey
+      };
+
+      const tagUpdates = {};
+      tagUpdates[`tags_patrimonio/${uidTagKey}`] = assetTagPayload;
+      if (uidTag !== uidTagKey) {
+        tagUpdates[`tags_patrimonio/${uidTag}`] = assetTagPayload;
+      }
+      await database.ref().update(tagUpdates);
+
+      const nowUnix = Math.floor(Date.now() / 1000);
+      const historyRef = database.ref("movimentacoes").push();
+      await historyRef.set({
+        patrimonio_id: patrimonioId,
+        patrimonio_codigo: codigo,
+        patrimonio_nome: nome,
+        uid_tag: uidTag,
+        tipo_movimentacao: "cadastro",
+        localizacao_resultante: localizacao,
+        confirmado_por_uid: auth.currentUser ? auth.currentUser.uid : null,
+        confirmado_por_nome: currentUserProfile ? currentUserProfile.nome : "",
+        distancia: null,
+        leitura_timestamp: null,
+        confirmado_em_unix: nowUnix,
+        confirmado_em_iso: new Date(nowUnix * 1000).toISOString()
+      });
+
+      document.getElementById("assetCode").value = "";
+      document.getElementById("assetName").value = "";
+      document.getElementById("assetCategory").value = "";
+      document.getElementById("assetTag").value = "";
+      document.getElementById("assetLocation").value = "";
+      document.getElementById("assetDescription").value = "";
+      imageInput.value = "";
+      const preview = document.getElementById("assetImagePreview");
+      preview.src = "";
+      preview.classList.add("hidden");
+
+      showToast("Patrimônio cadastrado e registrado no histórico.");
+    } catch (error) {
+      showToast("Erro ao salvar patrimônio: " + error.message, "error");
+    }
+  }
+
+  async function resolveAssetFromUid(uid) {
+    if (!uid) return null;
+    const normalizedUid = normalizeUid(uid);
+    const uidKey = uidToKey(normalizedUid);
+    if (!uidKey) return null;
+
+    async function resolveByPatrimonioScan() {
+      const patrimoniosSnap = await database.ref("patrimonios").once("value");
+      let resolved = null;
+
+      patrimoniosSnap.forEach(child => {
+        const asset = child.val() || {};
+        const assetUid = normalizeUid(asset.uid_tag || "");
+        if (!assetUid) return false;
+
+        const assetUidKey = uidToKey(assetUid);
+        if (assetUid === normalizedUid || assetUidKey === uidKey) {
+          resolved = {
+            ...asset,
+            id: asset.id || child.key
+          };
+          return true;
+        }
+        return false;
+      });
+
+      if (!resolved) return null;
+
+      // Auto-reparo: recria o mapeamento de tags para evitar falhas futuras.
+      const repairedPayload = {
+        patrimonio_id: resolved.id,
+        patrimonio_nome: resolved.nome || "",
+        patrimonio_codigo: resolved.codigo || "",
+        patrimonio_foto_base64: resolved.foto_base64 || "",
+        uid_original: normalizeUid(resolved.uid_tag || normalizedUid),
+        uid_key: uidKey
+      };
+      const repairUpdates = {};
+      repairUpdates[`tags_patrimonio/${uidKey}`] = repairedPayload;
+      if (repairedPayload.uid_original && repairedPayload.uid_original !== uidKey) {
+        repairUpdates[`tags_patrimonio/${repairedPayload.uid_original}`] = repairedPayload;
+      }
+      try {
+        await database.ref().update(repairUpdates);
+      } catch (repairError) {
+        console.warn("Falha no auto-reparo de tags_patrimonio:", repairError);
+      }
+
+      return resolved;
+    }
+
+    let tagSnap = await database.ref(`tags_patrimonio/${uidKey}`).once("value");
+    if (!tagSnap.exists()) {
+      // Compatibilidade com registros antigos salvos com espacos na chave.
+      const legacyUid = normalizedUid;
+      if (legacyUid && legacyUid !== uidKey) {
+        tagSnap = await database.ref(`tags_patrimonio/${legacyUid}`).once("value");
+      }
+    }
+    if (!tagSnap.exists()) {
+      return resolveByPatrimonioScan();
+    }
+
+    const tagData = tagSnap.val();
+    if (!tagData.patrimonio_id) {
+      return resolveByPatrimonioScan();
+    }
+
+    const assetSnap = await database.ref(`patrimonios/${tagData.patrimonio_id}`).once("value");
+    if (!assetSnap.exists()) {
+      return resolveByPatrimonioScan();
+    }
+
+    const asset = assetSnap.val() || {};
+    return {
+      ...asset,
+      id: asset.id || tagData.patrimonio_id || assetSnap.key
+    };
+  }
+
+  async function editAsset(assetId) {
+    if (!assetId) {
+      showToast("Patrimônio inválido para edição.", "error");
+      return;
+    }
+
+    try {
+      const assetSnap = await database.ref(`patrimonios/${assetId}`).once("value");
+      if (!assetSnap.exists()) {
+        showToast("Patrimônio não encontrado.", "error");
+        return;
+      }
+
+      const currentAsset = assetSnap.val();
+      editingAssetId = assetId;
+      editingAssetOriginalUid = normalizeUid(currentAsset.uid_tag || "");
+      editingAssetCurrentPhoto = currentAsset.foto_base64 || "";
+
+      document.getElementById("editAssetContext").textContent = `Editando: ${currentAsset.nome || "--"} (${currentAsset.codigo || "--"})`;
+      document.getElementById("editAssetCode").value = currentAsset.codigo || "";
+      document.getElementById("editAssetName").value = currentAsset.nome || "";
+      document.getElementById("editAssetCategory").value = currentAsset.categoria || "";
+      document.getElementById("editAssetTag").value = currentAsset.uid_tag || "";
+      document.getElementById("editAssetLocation").value = currentAsset.localizacao_padrao || currentAsset.localizacao_atual || "";
+      document.getElementById("editAssetDescription").value = currentAsset.descricao || "";
+      document.getElementById("editAssetImageInput").value = "";
+
+      const preview = document.getElementById("editAssetImagePreview");
+      if (editingAssetCurrentPhoto) {
+        preview.src = editingAssetCurrentPhoto;
+        preview.classList.remove("hidden");
+      } else {
+        preview.src = "";
+        preview.classList.add("hidden");
+      }
+
+      showTab("tabEditarPatrimonio", "tabButtonEditarPatrimonio");
+      document.getElementById("editAssetCard").scrollIntoView({ behavior: "smooth", block: "start" });
+    } catch (error) {
+      showToast("Erro ao abrir edição: " + error.message, "error");
+    }
+  }
+
+  function cancelEditAsset() {
+    editingAssetId = null;
+    editingAssetOriginalUid = "";
+    editingAssetCurrentPhoto = "";
+    document.getElementById("editAssetContext").textContent = "Selecione um patrimônio para editar.";
+    document.getElementById("editAssetCode").value = "";
+    document.getElementById("editAssetName").value = "";
+    document.getElementById("editAssetCategory").value = "";
+    document.getElementById("editAssetTag").value = "";
+    document.getElementById("editAssetLocation").value = "";
+    document.getElementById("editAssetDescription").value = "";
+    document.getElementById("editAssetImageInput").value = "";
+    const preview = document.getElementById("editAssetImagePreview");
+    preview.src = "";
+    preview.classList.add("hidden");
+    clearPhotoView();
+    showTab("tabPatrimonios", "tabButtonPatrimonios");
+  }
+
+  async function saveEditedAsset() {
+    if (!editingAssetId) {
+      showToast("Nenhum patrimônio selecionado para edição.", "error");
+      return;
+    }
+
+    const codigo = document.getElementById("editAssetCode").value.trim();
+    const nome = document.getElementById("editAssetName").value.trim();
+    const categoria = document.getElementById("editAssetCategory").value.trim();
+    const uidTag = normalizeUid(document.getElementById("editAssetTag").value);
+    const uidTagKey = uidToKey(uidTag);
+    const localizacaoPadrao = document.getElementById("editAssetLocation").value.trim();
+    const descricao = document.getElementById("editAssetDescription").value.trim();
+    const imageInput = document.getElementById("editAssetImageInput");
+    const newImageFile = imageInput.files && imageInput.files[0] ? imageInput.files[0] : null;
+
+    if (!codigo || !nome || !uidTag || !uidTagKey || !localizacaoPadrao) {
+      showToast("Código, nome, tag RFID e localização são obrigatórios.", "error");
+      return;
+    }
+
+    try {
+      const assetSnap = await database.ref(`patrimonios/${editingAssetId}`).once("value");
+      if (!assetSnap.exists()) {
+        showToast("Patrimônio não encontrado para atualização.", "error");
+        return;
+      }
+      const currentAsset = assetSnap.val();
+      const fotoBase64 = newImageFile ? await fileToCompressedBase64(newImageFile) : (currentAsset.foto_base64 || editingAssetCurrentPhoto || "");
+      const oldUid = normalizeUid(editingAssetOriginalUid || currentAsset.uid_tag || "");
+      const oldUidKey = uidToKey(oldUid);
+      const localizacaoAtual =
+        currentAsset.status_atual === "fora"
+          ? (currentAsset.localizacao_atual || "fora do recinto")
+          : localizacaoPadrao;
+
+      await database.ref(`patrimonios/${editingAssetId}`).update({
+        codigo,
+        nome,
+        categoria,
+        uid_tag: uidTag,
+        localizacao_padrao: localizacaoPadrao,
+        localizacao_atual: localizacaoAtual,
+        descricao,
+        foto_base64: fotoBase64,
+        atualizado_em: new Date().toISOString()
+      });
+
+      const assetTagPayload = {
+        patrimonio_id: editingAssetId,
+        patrimonio_nome: nome,
+        patrimonio_codigo: codigo,
+        patrimonio_foto_base64: fotoBase64,
+        uid_original: uidTag,
+        uid_key: uidTagKey
+      };
+
+      const tagUpdates = {};
+      tagUpdates[`tags_patrimonio/${uidTagKey}`] = assetTagPayload;
+      if (uidTag !== uidTagKey) {
+        tagUpdates[`tags_patrimonio/${uidTag}`] = assetTagPayload;
+      }
+
+      if (oldUidKey && oldUidKey !== uidTagKey) {
+        tagUpdates[`tags_patrimonio/${oldUidKey}`] = null;
+      }
+      if (oldUid && oldUid !== uidTag && oldUid !== oldUidKey) {
+        tagUpdates[`tags_patrimonio/${oldUid}`] = null;
+      }
+
+      await database.ref().update(tagUpdates);
+      cancelEditAsset();
+      showToast("Patrimônio atualizado com sucesso.");
+    } catch (error) {
+      showToast("Erro ao atualizar patrimônio: " + error.message, "error");
+    }
+  }
+
+  async function confirmMovement(tipo) {
+    if (!latestReading || !latestReadingKey) {
+      showToast("Nenhuma leitura pendente para confirmar.", "error");
+      return;
+    }
+
+    const uid = normalizeUid(latestReading.uid || "");
+    if (!uid) {
+      showToast("A leitura atual não possui UID válida.", "error");
+      return;
+    }
+
+    try {
+      const patrimonio = await resolveAssetFromUid(uid);
+      if (!patrimonio) {
+        showToast("Esta tag não está vinculada a nenhum patrimônio cadastrado.", "error");
+        return;
+      }
+
+      const movementRef = database.ref("movimentacoes").push();
+      const movementPayload = {
+        patrimonio_id: patrimonio.id,
+        patrimonio_codigo: patrimonio.codigo,
+        patrimonio_nome: patrimonio.nome,
+        uid_tag: uid,
+        tipo_movimentacao: tipo,
+        localizacao_resultante: tipo === "entrada" ? "dentro do recinto" : "fora do recinto",
+        confirmado_por_uid: auth.currentUser ? auth.currentUser.uid : null,
+        confirmado_por_nome: currentUserProfile ? currentUserProfile.nome : "",
+        distancia: latestReading.distancia ?? null,
+        leitura_timestamp: latestReading.timestamp || null,
+        confirmado_em_unix: Math.floor(Date.now() / 1000),
+        confirmado_em_iso: new Date().toISOString()
+      };
+
+      await movementRef.set(movementPayload);
+
+      await database.ref(`patrimonios/${patrimonio.id}`).update({
+        status_atual: tipo === "entrada" ? "dentro" : "fora",
+        localizacao_atual: tipo === "entrada" ? patrimonio.localizacao_padrao : "fora do recinto",
+        ultima_movimentacao_tipo: tipo,
+        ultima_movimentacao_em_unix: Math.floor(Date.now() / 1000),
+        ultima_movimentacao_por: currentUserProfile ? currentUserProfile.nome : ""
+      });
+
+      await database.ref(`leituras_recentes/${latestReadingKey}`).update({
+        processado: true,
+        tipo_movimentacao: tipo,
+        patrimonio_id: patrimonio.id,
+        patrimonio_nome: patrimonio.nome,
+        confirmado_por_nome: currentUserProfile ? currentUserProfile.nome : "",
+        confirmado_em_unix: Math.floor(Date.now() / 1000)
+      });
+
+      document.getElementById("movementProcessed").textContent = `Confirmado como ${tipo}`;
+      document.getElementById("statUltimoPatrimonio").textContent = patrimonio.nome;
+      document.getElementById("statUltimaAcao").textContent = tipo;
+      showToast(`Movimentação de ${patrimonio.nome} registrada como ${tipo}.`);
+    } catch (error) {
+      showToast("Erro ao confirmar movimentação: " + error.message, "error");
+    }
+  }
+
+  function renderAssets(items) {
+    const tbody = document.getElementById("assetsTableBody");
+    tbody.innerHTML = "";
+
+    if (!items.length) {
+      tbody.innerHTML = '<tr><td colspan="7" class="empty">Nenhum patrimônio cadastrado.</td></tr>';
+      return;
+    }
+
+    items.forEach(item => {
+      const tr = document.createElement("tr");
+      const statusClass = item.status_atual === "fora" ? "tag-red" : "tag-green";
+
+      tr.innerHTML = `
+        <td>${item.codigo || "--"}</td>
+        <td>${item.nome || "--"}</td>
+        <td>${item.uid_tag || "--"}</td>
+        <td>${(item.foto_base64 || item.foto_url) ? `<a href="${item.foto_base64 || item.foto_url}" target="_blank" rel="noopener noreferrer"><img src="${item.foto_base64 || item.foto_url}" alt="Foto do patrimônio" class="table-thumb"></a>` : "--"}</td>
+        <td><span class="tag ${statusClass}">${item.status_atual || "--"}</span></td>
+        <td>${item.localizacao_atual || "--"}</td>
+        <td>${item.id ? `<button class="btn-edit btn-small" onclick="editAsset('${item.id}')">Editar</button>` : "--"}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    document.getElementById("statPatrimonios").textContent = items.length;
+  }
+
+  function renderHistory(items) {
+    const tbody = document.getElementById("historyTableBody");
+    tbody.innerHTML = "";
+
+    if (!items.length) {
+      tbody.innerHTML = '<tr><td colspan="7" class="empty">Nenhuma movimentação registrada.</td></tr>';
+      return;
+    }
+
+    items.forEach(item => {
+      const tr = document.createElement("tr");
+      const tipoClass =
+        item.tipo_movimentacao === "saida"
+          ? "tag-yellow"
+          : item.tipo_movimentacao === "cadastro"
+            ? "tag-green"
+            : "tag-blue";
+      const horario = item.confirmado_em_unix ? formatTimestamp(item.confirmado_em_unix) : "--";
+
+      tr.innerHTML = `
+        <td>${horario}</td>
+        <td><span class="tag ${tipoClass}">${item.tipo_movimentacao || "--"}</span></td>
+        <td>${item.patrimonio_nome || "--"}<br><span class="muted">${item.patrimonio_codigo || ""}</span></td>
+        <td>${item.uid_tag || "--"}</td>
+        <td>${item.confirmado_por_nome || "--"}</td>
+        <td>${item.localizacao_resultante || "--"}</td>
+        <td>${item.patrimonio_id ? `<button class="btn-edit btn-small" onclick="editAsset('${item.patrimonio_id}')">Editar</button>` : "--"}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    const hoje = new Date().toDateString();
+    const hojeCount = items.filter(item => item.confirmado_em_unix && new Date(item.confirmado_em_unix * 1000).toDateString() === hoje).length;
+    document.getElementById("statHoje").textContent = hojeCount;
+  }
+
+  async function processLatestReading(reading, readingKey) {
+    latestReading = reading;
+    latestReadingKey = readingKey;
+
+    const uid = normalizeUid(reading.uid || "");
+    const patrimonio = await resolveAssetFromUid(uid);
+    latestAssetResolved = patrimonio;
+
+    document.getElementById("dashUid").textContent = uid || "--";
+    document.getElementById("dashNomeBruto").textContent = reading.nome || "--";
+    document.getElementById("dashDistancia").textContent = reading.distancia !== undefined ? `${Number(reading.distancia).toFixed(1)} cm` : "--";
+    document.getElementById("dashHorario").textContent = formatTimestamp(reading.timestamp);
+    document.getElementById("dashPatrimonio").textContent = patrimonio ? patrimonio.nome : "Tag não vinculada a patrimônio";
+
+    document.getElementById("movementUid").textContent = uid || "--";
+    document.getElementById("movementAssetName").textContent = patrimonio ? patrimonio.nome : "Nenhum patrimônio identificado";
+    document.getElementById("movementAssetCode").textContent = patrimonio ? patrimonio.codigo : "--";
+    document.getElementById("movementDistance").textContent = reading.distancia !== undefined ? `${Number(reading.distancia).toFixed(1)} cm` : "--";
+    document.getElementById("movementTime").textContent = formatTimestamp(reading.timestamp);
+    document.getElementById("movementCurrentStatus").textContent = patrimonio ? (patrimonio.status_atual || "--") : "--";
+
+    if (reading.processado && reading.tipo_movimentacao) {
+      document.getElementById("movementProcessed").textContent = `Já processado como ${reading.tipo_movimentacao}`;
+    } else {
+      document.getElementById("movementProcessed").textContent = "Aguardando confirmação";
+    }
+
+    document.getElementById("statUltimoPatrimonio").textContent = patrimonio ? patrimonio.nome : "--";
+  }
+
+  function startRealtimeListeners() {
+    database.ref("patrimonios").on("value", snapshot => {
+      const items = [];
+      snapshot.forEach(child => items.push(child.val()));
+      items.sort((a, b) => (a.nome || "").localeCompare(b.nome || ""));
+      renderAssets(items);
+    });
+
+    database.ref("movimentacoes").limitToLast(100).on("value", snapshot => {
+      const items = [];
+      snapshot.forEach(child => items.push(child.val()));
+      items.sort((a, b) => (b.confirmado_em_unix || 0) - (a.confirmado_em_unix || 0));
+      renderHistory(items);
+
+      if (items.length > 0) {
+        document.getElementById("statUltimaAcao").textContent = items[0].tipo_movimentacao || "--";
+      }
+    });
+
+    database.ref("leituras_recentes").limitToLast(80).on("value", async snapshot => {
+      const readings = [];
+      snapshot.forEach(child => {
+        readings.push({
+          key: child.key,
+          ...child.val()
+        });
+      });
+
+      if (!readings.length) return;
+
+      readings.sort((a, b) => {
+        const tsA = Number(a.timestamp || 0);
+        const tsB = Number(b.timestamp || 0);
+        if (tsA !== tsB) return tsB - tsA;
+        return String(b.key || "").localeCompare(String(a.key || ""));
+      });
+
+      // Prioriza leitura ainda nao processada; se nao houver, mostra a mais recente.
+      const selectedReading = readings.find(item => !item.processado) || readings[0];
+      if (!selectedReading) return;
+
+      await processLatestReading(selectedReading, selectedReading.key);
+    });
+  }
+
+  auth.onAuthStateChanged(async user => {
+    if (!user) {
+      showAuth();
+      return;
+    }
+
+    const snap = await database.ref(`usuarios_sistema/${user.uid}`).once("value");
+    if (!snap.exists()) {
+      showAuth();
+      return;
+    }
+
+    const profile = snap.val();
+    showApp(profile);
+  });
+</script>
+</body>
+</html>

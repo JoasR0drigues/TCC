@@ -1,0 +1,27 @@
+{
+  "name": "patrimonio-rfid-android",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Projeto Android (Node.js + JavaScript) para o painel patrimonial RFID.",
+  "main": "server.js",
+  "scripts": {
+    "dev": "node server.js",
+    "copy:web": "node scripts/prepare-web.js",
+    "android:sync": "npm run copy:web && npx cap sync android",
+    "android:init": "npm run copy:web && npx cap add android",
+    "android:open": "npx cap open android",
+    "android:run": "npm run android:sync && npx cap run android"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "firebase": "^12.12.1"
+  },
+  "devDependencies": {
+    "@capacitor/android": "^6.2.0",
+    "@capacitor/cli": "^6.2.0",
+    "@capacitor/core": "^6.2.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

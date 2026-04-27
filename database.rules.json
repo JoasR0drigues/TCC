@@ -1,0 +1,53 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "usuarios_sistema": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid"
+      }
+    },
+    "usuarios": {
+      ".read": "auth != null",
+      "$uidTag": {
+        ".write": "auth != null"
+      }
+    },
+    "patrimonios": {
+      ".read": "auth != null",
+      "$patrimonioId": {
+        ".write": "auth != null"
+      }
+    },
+    "tags_patrimonio": {
+      ".read": "auth != null",
+      "$uidTag": {
+        ".write": "auth != null"
+      }
+    },
+    "movimentacoes": {
+      ".read": "auth != null",
+      "$movId": {
+        ".write": "auth != null"
+      }
+    },
+    "leituras_recentes": {
+      ".read": "auth != null",
+      ".indexOn": ["timestamp"],
+      "$leituraId": {
+        ".write": true
+      }
+    },
+    "acessos": {
+      ".read": "auth != null",
+      "$acessoId": {
+        ".write": true
+      }
+    },
+    "teste_conexao": {
+      ".read": "auth != null",
+      ".write": true
+    }
+  }
+}

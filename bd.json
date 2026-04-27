@@ -1,0 +1,38 @@
+{
+  "usuarios_sistema": {
+    "UID_DO_USUARIO_FIREBASE": {
+      "nome": "Joas",
+      "email": "joas@email.com",
+      "uid_cartao": "F7 29 67 C9",
+      "criado_em": "2026-04-21T20:00:00.000Z"
+    }
+  },
+  "usuarios": {
+    "F7 29 67 C9": {
+      "nome": "Joas",
+      "vinculado_ao_usuario": "UID_DO_USUARIO_FIREBASE"
+    }
+  },
+  "patrimonios": {
+    "PAT_ID_1": {
+      "id": "PAT_ID_1",
+      "codigo": "PAT-001",
+      "nome": "Mesa da sala 01",
+      "categoria": "Mobiliário",
+      "uid_tag": "A1 B2 C3 D4",
+      "localizacao_padrao": "Sala 01",
+      "localizacao_atual": "Sala 01",
+      "status_atual": "dentro",
+      "descricao": "Mesa de madeira"
+    }
+  },
+  "tags_patrimonio": {
+    "A1 B2 C3 D4": {
+      "patrimonio_id": "PAT_ID_1",
+      "patrimonio_nome": "Mesa da sala 01",
+      "patrimonio_codigo": "PAT-001"
+    }
+  },
+  "leituras_recentes": {},
+  "movimentacoes": {}
+}
