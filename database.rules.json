@@ -32,6 +32,20 @@
         ".write": "auth != null"
       }
     },
+    "salas": {
+      ".read": "auth != null",
+      "$salaId": {
+        ".write": "auth != null"
+      }
+    },
+    "salas_patrimonios": {
+      ".read": "auth != null",
+      "$salaId": {
+        "$patrimonioId": {
+          ".write": "auth != null"
+        }
+      }
+    },
     "leituras_recentes": {
       ".read": "auth != null",
       ".indexOn": ["timestamp"],

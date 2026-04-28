@@ -390,7 +390,7 @@
           <div class="logo-frame">
             <img
               class="welcome-logo"
-              src="www/assets/logo.png"
+              src="./icon.svg"
               alt="Logo Proteção Patrimonial RFID"
             >
           </div>
@@ -553,6 +553,65 @@
       </div>
 
       <div id="tabHistorico" class="tab hidden">
+        <div class="grid grid-2" style="margin-bottom: 16px;">
+          <div class="card">
+            <h3>Cadastrar local e sala</h3>
+            <p class="muted" style="margin-bottom: 12px;">
+              Crie os ambientes para organizar os patrimônios por local e sala.
+            </p>
+            <div class="field">
+              <label for="roomLocalName">Nome do local</label>
+              <input id="roomLocalName" type="text" placeholder="Ex: Bloco Administrativo">
+            </div>
+            <div class="field">
+              <label for="roomSpecificName">Sala específica</label>
+              <input id="roomSpecificName" type="text" placeholder="Ex: Sala 01">
+            </div>
+            <div class="row">
+              <button class="btn-primary" onclick="createRoom()">Criar sala</button>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3>Vincular patrimônio em sala</h3>
+            <p class="muted" style="margin-bottom: 12px;">
+              Escolha uma sala e um patrimônio para definir a localização padrão.
+            </p>
+            <div class="field">
+              <label for="roomSelect">Sala cadastrada</label>
+              <select id="roomSelect">
+                <option value="">Selecione uma sala</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="roomAssetSelect">Patrimônio</label>
+              <select id="roomAssetSelect">
+                <option value="">Selecione um patrimônio</option>
+              </select>
+            </div>
+            <div class="row">
+              <button class="btn-success" onclick="assignAssetToRoom()">Vincular patrimônio</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-bottom: 16px;">
+          <h3>Salas e patrimônios vinculados</h3>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Local</th>
+                  <th>Sala</th>
+                  <th>Patrimônios vinculados</th>
+                  <th>Total</th>
+                </tr>
+              </thead>
+              <tbody id="roomsTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+
         <div class="card">
           <h3>Histórico de movimentações</h3>
           <div class="table-wrap">
@@ -675,6 +734,9 @@
   let editingAssetOriginalUid = "";
   let editingAssetCurrentPhoto = "";
   let photoViewerData = null;
+  let cachedAssets = [];
+  let cachedRooms = [];
+  let cachedRoomAssignments = {};
 
   function showToast(message, type = "success") {
     const toast = document.getElementById("toast");
@@ -698,6 +760,200 @@
   function formatTimestamp(seconds) {
     if (!seconds) return "--";
     return new Date(seconds * 1000).toLocaleString("pt-BR");
+  }
+
+  function normalizeText(value) {
+    return (value || "").trim().replace(/\s+/g, " ");
+  }
+
+  function escapeHtml(value) {
+    return String(value || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
+
+  function getRoomDisplayName(room) {
+    if (!room) return "--";
+    const localNome = normalizeText(room.local_nome || "");
+    const salaNome = normalizeText(room.sala_nome || "");
+    if (localNome && salaNome) return `${localNome} - ${salaNome}`;
+    return room.nome_completo || localNome || salaNome || "--";
+  }
+
+  function renderRoomSelectOptions() {
+    const roomSelect = document.getElementById("roomSelect");
+    if (!roomSelect) return;
+    const previousValue = roomSelect.value;
+    roomSelect.innerHTML = '<option value="">Selecione uma sala</option>';
+
+    cachedRooms.forEach(room => {
+      const option = document.createElement("option");
+      option.value = room.id;
+      option.textContent = getRoomDisplayName(room);
+      roomSelect.appendChild(option);
+    });
+
+    if (previousValue && cachedRooms.some(room => room.id === previousValue)) {
+      roomSelect.value = previousValue;
+    }
+  }
+
+  function renderRoomAssetOptions() {
+    const assetSelect = document.getElementById("roomAssetSelect");
+    if (!assetSelect) return;
+    const previousValue = assetSelect.value;
+    assetSelect.innerHTML = '<option value="">Selecione um patrimônio</option>';
+
+    cachedAssets.forEach(asset => {
+      if (!asset.id) return;
+      const option = document.createElement("option");
+      option.value = asset.id;
+      option.textContent = `${asset.nome || "--"} (${asset.codigo || "--"})`;
+      assetSelect.appendChild(option);
+    });
+
+    if (previousValue && cachedAssets.some(asset => asset.id === previousValue)) {
+      assetSelect.value = previousValue;
+    }
+  }
+
+  function renderRoomsTable() {
+    const tbody = document.getElementById("roomsTableBody");
+    if (!tbody) return;
+    tbody.innerHTML = "";
+
+    if (!cachedRooms.length) {
+      tbody.innerHTML = '<tr><td colspan="4" class="empty">Nenhuma sala cadastrada.</td></tr>';
+      return;
+    }
+
+    cachedRooms.forEach(room => {
+      const assignments = cachedRoomAssignments[room.id] || {};
+      const assignmentList = Object.values(assignments);
+      const names = assignmentList
+        .map(item => `${item.patrimonio_nome || "--"} (${item.patrimonio_codigo || "--"})`)
+        .join(", ");
+
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${escapeHtml(room.local_nome || "--")}</td>
+        <td>${escapeHtml(room.sala_nome || "--")}</td>
+        <td>${assignmentList.length ? escapeHtml(names) : "--"}</td>
+        <td>${assignmentList.length}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  async function createRoom() {
+    const localNome = normalizeText(document.getElementById("roomLocalName").value);
+    const salaNome = normalizeText(document.getElementById("roomSpecificName").value);
+
+    if (!localNome || !salaNome) {
+      showToast("Informe o nome do local e da sala.", "error");
+      return;
+    }
+
+    const duplicate = cachedRooms.some(room =>
+      normalizeText(room.local_nome || "").toLowerCase() === localNome.toLowerCase() &&
+      normalizeText(room.sala_nome || "").toLowerCase() === salaNome.toLowerCase()
+    );
+
+    if (duplicate) {
+      showToast("Essa sala já está cadastrada para esse local.", "error");
+      return;
+    }
+
+    try {
+      const roomRef = database.ref("salas").push();
+      await roomRef.set({
+        id: roomRef.key,
+        local_nome: localNome,
+        sala_nome: salaNome,
+        nome_completo: `${localNome} - ${salaNome}`,
+        criado_em: new Date().toISOString(),
+        criado_por_uid: auth.currentUser ? auth.currentUser.uid : null,
+        criado_por_nome: currentUserProfile ? currentUserProfile.nome : ""
+      });
+
+      document.getElementById("roomLocalName").value = "";
+      document.getElementById("roomSpecificName").value = "";
+      showToast("Sala criada com sucesso.");
+    } catch (error) {
+      showToast("Erro ao criar sala: " + error.message, "error");
+    }
+  }
+
+  async function assignAssetToRoom() {
+    const salaId = document.getElementById("roomSelect").value;
+    const patrimonioId = document.getElementById("roomAssetSelect").value;
+
+    if (!salaId || !patrimonioId) {
+      showToast("Selecione a sala e o patrimônio.", "error");
+      return;
+    }
+
+    const room = cachedRooms.find(item => item.id === salaId);
+    const asset = cachedAssets.find(item => item.id === patrimonioId);
+    if (!room || !asset) {
+      showToast("Sala ou patrimônio inválido para vínculo.", "error");
+      return;
+    }
+
+    try {
+      const rootRef = database.ref();
+      const movementId = rootRef.child("movimentacoes").push().key;
+      if (!movementId) {
+        throw new Error("Não foi possível gerar o registro de movimentação.");
+      }
+
+      const roomName = getRoomDisplayName(room);
+      const nowUnix = Math.floor(Date.now() / 1000);
+      const updates = {};
+      updates[`salas_patrimonios/${salaId}/${patrimonioId}`] = {
+        patrimonio_id: patrimonioId,
+        patrimonio_nome: asset.nome || "",
+        patrimonio_codigo: asset.codigo || "",
+        sala_id: salaId,
+        sala_nome: roomName,
+        atualizado_em: new Date().toISOString()
+      };
+
+      Object.keys(cachedRoomAssignments).forEach(existingRoomId => {
+        if (existingRoomId !== salaId && cachedRoomAssignments[existingRoomId] && cachedRoomAssignments[existingRoomId][patrimonioId]) {
+          updates[`salas_patrimonios/${existingRoomId}/${patrimonioId}`] = null;
+        }
+      });
+
+      updates[`patrimonios/${patrimonioId}/sala_id`] = salaId;
+      updates[`patrimonios/${patrimonioId}/sala_nome`] = roomName;
+      updates[`patrimonios/${patrimonioId}/localizacao_padrao`] = roomName;
+      updates[`patrimonios/${patrimonioId}/localizacao_atual`] = asset.status_atual === "fora" ? (asset.localizacao_atual || "fora do recinto") : roomName;
+      updates[`patrimonios/${patrimonioId}/atualizado_em`] = new Date().toISOString();
+
+      updates[`movimentacoes/${movementId}`] = {
+        patrimonio_id: patrimonioId,
+        patrimonio_codigo: asset.codigo || "",
+        patrimonio_nome: asset.nome || "",
+        uid_tag: asset.uid_tag || "",
+        tipo_movimentacao: "alocacao_sala",
+        localizacao_resultante: roomName,
+        confirmado_por_uid: auth.currentUser ? auth.currentUser.uid : null,
+        confirmado_por_nome: currentUserProfile ? currentUserProfile.nome : "",
+        distancia: null,
+        leitura_timestamp: null,
+        confirmado_em_unix: nowUnix,
+        confirmado_em_iso: new Date(nowUnix * 1000).toISOString()
+      };
+
+      await rootRef.update(updates);
+      showToast(`Patrimônio ${asset.nome || ""} vinculado em ${roomName}.`);
+    } catch (error) {
+      showToast("Erro ao vincular patrimônio na sala: " + error.message, "error");
+    }
   }
 
   function showTab(tabId, buttonId) {
@@ -941,8 +1197,12 @@
     }
 
     try {
-      const patrimonioRef = database.ref("patrimonios").push();
-      const patrimonioId = patrimonioRef.key;
+      const rootRef = database.ref();
+      const patrimonioId = rootRef.child("patrimonios").push().key;
+      const movementId = rootRef.child("movimentacoes").push().key;
+      if (!patrimonioId || !movementId) {
+        throw new Error("Nao foi possivel gerar identificadores para salvar o patrimonio.");
+      }
       let fotoBase64 = "";
 
       if (imageFile) {
@@ -964,8 +1224,6 @@
         criado_em: new Date().toISOString()
       };
 
-      await patrimonioRef.set(payload);
-
       const assetTagPayload = {
         patrimonio_id: patrimonioId,
         patrimonio_nome: nome,
@@ -975,16 +1233,15 @@
         uid_key: uidTagKey
       };
 
-      const tagUpdates = {};
-      tagUpdates[`tags_patrimonio/${uidTagKey}`] = assetTagPayload;
+      const updates = {};
+      updates[`patrimonios/${patrimonioId}`] = payload;
+      updates[`tags_patrimonio/${uidTagKey}`] = assetTagPayload;
       if (uidTag !== uidTagKey) {
-        tagUpdates[`tags_patrimonio/${uidTag}`] = assetTagPayload;
+        updates[`tags_patrimonio/${uidTag}`] = assetTagPayload;
       }
-      await database.ref().update(tagUpdates);
 
       const nowUnix = Math.floor(Date.now() / 1000);
-      const historyRef = database.ref("movimentacoes").push();
-      await historyRef.set({
+      updates[`movimentacoes/${movementId}`] = {
         patrimonio_id: patrimonioId,
         patrimonio_codigo: codigo,
         patrimonio_nome: nome,
@@ -997,7 +1254,9 @@
         leitura_timestamp: null,
         confirmado_em_unix: nowUnix,
         confirmado_em_iso: new Date(nowUnix * 1000).toISOString()
-      });
+      };
+
+      await rootRef.update(updates);
 
       document.getElementById("assetCode").value = "";
       document.getElementById("assetName").value = "";
@@ -1236,6 +1495,54 @@
     }
   }
 
+  async function deleteAsset(assetId) {
+    if (!assetId) {
+      showToast("Patrimônio inválido para exclusão.", "error");
+      return;
+    }
+
+    const asset = cachedAssets.find(item => item.id === assetId);
+    const assetName = asset ? `${asset.nome || "--"} (${asset.codigo || "--"})` : "este patrimônio";
+    const confirmed = window.confirm(`Tem certeza que deseja excluir ${assetName}? Essa ação não pode ser desfeita.`);
+    if (!confirmed) return;
+
+    try {
+      const assetSnap = await database.ref(`patrimonios/${assetId}`).once("value");
+      if (!assetSnap.exists()) {
+        showToast("Patrimônio não encontrado para exclusão.", "error");
+        return;
+      }
+
+      const currentAsset = assetSnap.val() || {};
+      const uidTag = normalizeUid(currentAsset.uid_tag || "");
+      const uidTagKey = uidToKey(uidTag);
+      const updates = {};
+
+      updates[`patrimonios/${assetId}`] = null;
+      if (uidTagKey) {
+        updates[`tags_patrimonio/${uidTagKey}`] = null;
+      }
+      if (uidTag && uidTag !== uidTagKey) {
+        updates[`tags_patrimonio/${uidTag}`] = null;
+      }
+
+      Object.keys(cachedRoomAssignments).forEach(roomId => {
+        if (cachedRoomAssignments[roomId] && cachedRoomAssignments[roomId][assetId]) {
+          updates[`salas_patrimonios/${roomId}/${assetId}`] = null;
+        }
+      });
+
+      if (editingAssetId === assetId) {
+        cancelEditAsset();
+      }
+
+      await database.ref().update(updates);
+      showToast("Patrimônio excluído com sucesso.");
+    } catch (error) {
+      showToast("Erro ao excluir patrimônio: " + error.message, "error");
+    }
+  }
+
   async function confirmMovement(tipo) {
     if (!latestReading || !latestReadingKey) {
       showToast("Nenhuma leitura pendente para confirmar.", "error");
@@ -1319,11 +1626,14 @@
         <td>${(item.foto_base64 || item.foto_url) ? `<a href="${item.foto_base64 || item.foto_url}" target="_blank" rel="noopener noreferrer"><img src="${item.foto_base64 || item.foto_url}" alt="Foto do patrimônio" class="table-thumb"></a>` : "--"}</td>
         <td><span class="tag ${statusClass}">${item.status_atual || "--"}</span></td>
         <td>${item.localizacao_atual || "--"}</td>
-        <td>${item.id ? `<button class="btn-edit btn-small" onclick="editAsset('${item.id}')">Editar</button>` : "--"}</td>
+        <td>${item.id ? `<div class="row"><button class="btn-edit btn-small" onclick="editAsset('${item.id}')">Editar</button><button class="btn-danger btn-small" onclick="deleteAsset('${item.id}')">Excluir</button></div>` : "--"}</td>
       `;
       tbody.appendChild(tr);
     });
 
+    cachedAssets = items;
+    renderRoomAssetOptions();
+    renderRoomsTable();
     document.getElementById("statPatrimonios").textContent = items.length;
   }
 
@@ -1341,6 +1651,8 @@
       const tipoClass =
         item.tipo_movimentacao === "saida"
           ? "tag-yellow"
+          : item.tipo_movimentacao === "alocacao_sala"
+            ? "tag-gray"
           : item.tipo_movimentacao === "cadastro"
             ? "tag-green"
             : "tag-blue";
@@ -1353,7 +1665,7 @@
         <td>${item.uid_tag || "--"}</td>
         <td>${item.confirmado_por_nome || "--"}</td>
         <td>${item.localizacao_resultante || "--"}</td>
-        <td>${item.patrimonio_id ? `<button class="btn-edit btn-small" onclick="editAsset('${item.patrimonio_id}')">Editar</button>` : "--"}</td>
+        <td>${item.patrimonio_id ? `<div class="row"><button class="btn-edit btn-small" onclick="editAsset('${item.patrimonio_id}')">Editar</button><button class="btn-danger btn-small" onclick="deleteAsset('${item.patrimonio_id}')">Excluir</button></div>` : "--"}</td>
       `;
       tbody.appendChild(tr);
     });
@@ -1396,9 +1708,35 @@
   function startRealtimeListeners() {
     database.ref("patrimonios").on("value", snapshot => {
       const items = [];
-      snapshot.forEach(child => items.push(child.val()));
+      snapshot.forEach(child => {
+        const item = child.val() || {};
+        items.push({
+          ...item,
+          id: item.id || child.key
+        });
+      });
       items.sort((a, b) => (a.nome || "").localeCompare(b.nome || ""));
       renderAssets(items);
+    });
+
+    database.ref("salas").on("value", snapshot => {
+      const items = [];
+      snapshot.forEach(child => {
+        const room = child.val() || {};
+        items.push({
+          ...room,
+          id: room.id || child.key
+        });
+      });
+      items.sort((a, b) => getRoomDisplayName(a).localeCompare(getRoomDisplayName(b)));
+      cachedRooms = items;
+      renderRoomSelectOptions();
+      renderRoomsTable();
+    });
+
+    database.ref("salas_patrimonios").on("value", snapshot => {
+      cachedRoomAssignments = snapshot.val() || {};
+      renderRoomsTable();
     });
 
     database.ref("movimentacoes").limitToLast(100).on("value", snapshot => {
