@@ -338,6 +338,50 @@
       text-align: center;
       color: #64748b;
     }
+    .room-list {
+      border: 1px solid #e2e8f0;
+      border-radius: 14px;
+      background: white;
+      max-height: 340px;
+      overflow-y: auto;
+    }
+    .room-list-item {
+      width: 100%;
+      text-align: left;
+      border: none;
+      border-bottom: 1px solid #e2e8f0;
+      background: transparent;
+      padding: 12px 14px;
+      border-radius: 0;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      font-weight: 700;
+      color: #0f172a;
+    }
+    .room-list-item:last-child {
+      border-bottom: none;
+    }
+    .room-list-item:hover {
+      background: #f8fafc;
+    }
+    .room-list-item.active {
+      background: #dbeafe;
+      color: #1e3a8a;
+    }
+    .room-count {
+      display: inline-block;
+      min-width: 28px;
+      text-align: center;
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: #e2e8f0;
+      color: #334155;
+      font-size: 12px;
+      font-weight: 800;
+    }
   </style>
 </head>
 <body>
@@ -414,7 +458,7 @@
         <button class="btn-secondary active" id="tabButtonDashboard" onclick="showTab('tabDashboard', 'tabButtonDashboard')">Dashboard</button>
         <button class="btn-secondary" id="tabButtonPatrimonios" onclick="showTab('tabPatrimonios', 'tabButtonPatrimonios')">Patrimônios</button>
         <button class="btn-secondary" id="tabButtonMovimentacao" onclick="showTab('tabMovimentacao', 'tabButtonMovimentacao')">Movimentação</button>
-        <button class="btn-secondary" id="tabButtonHistorico" onclick="showTab('tabHistorico', 'tabButtonHistorico')">Histórico</button>
+        <button class="btn-secondary" id="tabButtonHistorico" onclick="showTab('tabHistorico', 'tabButtonHistorico')">Locais e movimentações</button>
         <button class="btn-secondary hidden" id="tabButtonEditarPatrimonio" onclick="showTab('tabEditarPatrimonio', 'tabButtonEditarPatrimonio')">Editar patrimônio</button>
         <button class="btn-secondary hidden" id="tabButtonFotoPatrimonio" onclick="showTab('tabFotoPatrimonio', 'tabButtonFotoPatrimonio')">FOTO/DETALHES</button>
       </div>
@@ -595,25 +639,46 @@
           </div>
         </div>
 
-        <div class="card" style="margin-bottom: 16px;">
-          <h3>Salas e patrimônios vinculados</h3>
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Local</th>
-                  <th>Sala</th>
-                  <th>Patrimônios vinculados</th>
-                  <th>Total</th>
-                </tr>
-              </thead>
-              <tbody id="roomsTableBody"></tbody>
-            </table>
+        <div class="grid grid-2" style="margin-bottom: 16px;">
+          <div class="card">
+            <h3>Salas vinculadas</h3>
+            <div class="field">
+              <label for="roomSearchInput">Buscar sala</label>
+              <input
+                id="roomSearchInput"
+                type="text"
+                placeholder="Ex: Bloco A ou Sala 01"
+                oninput="handleRoomSearchInput(event)"
+              >
+            </div>
+            <div id="roomsList" class="room-list"></div>
+          </div>
+
+          <div class="card">
+            <h3>Patrimônios da sala</h3>
+            <p class="muted" id="selectedRoomTitle" style="margin-bottom: 12px;">Selecione uma sala para visualizar os patrimônios vinculados.</p>
+            <div class="row" style="margin-bottom: 12px;">
+              <button id="deleteSelectedRoomButton" class="btn-danger btn-small" type="button" onclick="deleteSelectedRoom()" disabled>Excluir sala selecionada</button>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Código</th>
+                    <th>Patrimônio</th>
+                    <th>Status</th>
+                    <th>Localização atual</th>
+                    <th>Ações</th>
+                  </tr>
+                </thead>
+                <tbody id="roomAssetsTableBody"></tbody>
+              </table>
+            </div>
           </div>
         </div>
 
         <div class="card">
-          <h3>Histórico de movimentações</h3>
+          <h3>Movimentações de patrimônios</h3>
           <div class="table-wrap">
             <table>
               <thead>
@@ -737,6 +802,8 @@
   let cachedAssets = [];
   let cachedRooms = [];
   let cachedRoomAssignments = {};
+  let selectedRoomId = null;
+  let roomSearchTerm = "";
 
   function showToast(message, type = "success") {
     const toast = document.getElementById("toast");
@@ -820,31 +887,106 @@
     }
   }
 
-  function renderRoomsTable() {
-    const tbody = document.getElementById("roomsTableBody");
-    if (!tbody) return;
-    tbody.innerHTML = "";
+  function handleRoomSearchInput(event) {
+    roomSearchTerm = normalizeText(event?.target?.value || "");
+    renderRoomsTable();
+  }
 
-    if (!cachedRooms.length) {
-      tbody.innerHTML = '<tr><td colspan="4" class="empty">Nenhuma sala cadastrada.</td></tr>';
+  function getFilteredRooms() {
+    const search = normalizeText(roomSearchTerm).toLowerCase();
+    if (!search) return cachedRooms;
+    return cachedRooms.filter(room => {
+      const display = getRoomDisplayName(room).toLowerCase();
+      const local = normalizeText(room.local_nome || "").toLowerCase();
+      const sala = normalizeText(room.sala_nome || "").toLowerCase();
+      return display.includes(search) || local.includes(search) || sala.includes(search);
+    });
+  }
+
+  function selectRoom(roomId) {
+    selectedRoomId = roomId || null;
+    renderRoomsTable();
+  }
+
+  function renderRoomsTable() {
+    const roomsList = document.getElementById("roomsList");
+    const selectedRoomTitle = document.getElementById("selectedRoomTitle");
+    const roomAssetsTableBody = document.getElementById("roomAssetsTableBody");
+    const deleteSelectedRoomButton = document.getElementById("deleteSelectedRoomButton");
+    if (!roomsList || !selectedRoomTitle || !roomAssetsTableBody || !deleteSelectedRoomButton) return;
+
+    roomsList.innerHTML = "";
+    roomAssetsTableBody.innerHTML = "";
+
+    const filteredRooms = getFilteredRooms();
+    if (selectedRoomId && !cachedRooms.some(room => room.id === selectedRoomId)) {
+      selectedRoomId = null;
+    }
+    if (filteredRooms.length && !filteredRooms.some(room => room.id === selectedRoomId)) {
+      selectedRoomId = filteredRooms[0].id;
+    }
+    if (!filteredRooms.length) {
+      selectedRoomId = null;
+    }
+
+    if (!filteredRooms.length) {
+      roomsList.innerHTML = '<div class="empty">Nenhuma sala encontrada.</div>';
+      selectedRoomTitle.textContent = "Nenhuma sala disponível para exibir patrimônios vinculados.";
+      roomAssetsTableBody.innerHTML = '<tr><td colspan="5" class="empty">Nenhum patrimônio vinculado.</td></tr>';
+      deleteSelectedRoomButton.disabled = true;
       return;
     }
 
-    cachedRooms.forEach(room => {
+    filteredRooms.forEach(room => {
       const assignments = cachedRoomAssignments[room.id] || {};
-      const assignmentList = Object.values(assignments);
-      const names = assignmentList
-        .map(item => `${item.patrimonio_nome || "--"} (${item.patrimonio_codigo || "--"})`)
-        .join(", ");
+      const count = Object.keys(assignments).length;
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = `room-list-item${room.id === selectedRoomId ? " active" : ""}`;
+      button.onclick = () => selectRoom(room.id);
+      button.innerHTML = `
+        <span>${escapeHtml(getRoomDisplayName(room))}</span>
+        <span class="room-count">${count}</span>
+      `;
+      roomsList.appendChild(button);
+    });
+
+    const selectedRoom = cachedRooms.find(room => room.id === selectedRoomId);
+    if (!selectedRoom) {
+      selectedRoomTitle.textContent = "Selecione uma sala para visualizar os patrimônios vinculados.";
+      roomAssetsTableBody.innerHTML = '<tr><td colspan="5" class="empty">Nenhum patrimônio vinculado.</td></tr>';
+      deleteSelectedRoomButton.disabled = true;
+      return;
+    }
+
+    selectedRoomTitle.textContent = `Sala selecionada: ${getRoomDisplayName(selectedRoom)}`;
+    deleteSelectedRoomButton.disabled = false;
+    const selectedAssignments = Object.values(cachedRoomAssignments[selectedRoom.id] || {});
+    if (!selectedAssignments.length) {
+      roomAssetsTableBody.innerHTML = '<tr><td colspan="5" class="empty">Nenhum patrimônio vinculado nesta sala.</td></tr>';
+      return;
+    }
+
+    selectedAssignments.forEach(assignment => {
+      const assetId = assignment.patrimonio_id || "";
+      const asset = cachedAssets.find(item => item.id === assetId) || {};
+      const codigo = asset.codigo || assignment.patrimonio_codigo || "--";
+      const nome = asset.nome || assignment.patrimonio_nome || "--";
+      const localizacao = asset.localizacao_atual || asset.localizacao_padrao || getRoomDisplayName(selectedRoom);
+      const status = asset.status_atual || "--";
+      const statusClass =
+        status === "fora" ? "tag-red" :
+        status === "dentro" ? "tag-green" : "tag-gray";
 
       const tr = document.createElement("tr");
       tr.innerHTML = `
-        <td>${escapeHtml(room.local_nome || "--")}</td>
-        <td>${escapeHtml(room.sala_nome || "--")}</td>
-        <td>${assignmentList.length ? escapeHtml(names) : "--"}</td>
-        <td>${assignmentList.length}</td>
+        <td>${escapeHtml(codigo)}</td>
+        <td>${escapeHtml(nome)}</td>
+        <td><span class="tag ${statusClass}">${escapeHtml(status)}</span></td>
+        <td>${escapeHtml(localizacao)}</td>
+        <td>${assetId ? `<div class="row"><button class="btn-edit btn-small" onclick="editAsset('${assetId}')">Editar</button><button class="btn-danger btn-small" onclick="deleteAsset('${assetId}')">Excluir</button></div>` : "--"}</td>
       `;
-      tbody.appendChild(tr);
+      roomAssetsTableBody.appendChild(tr);
     });
   }
 
@@ -953,6 +1095,44 @@
       showToast(`Patrimônio ${asset.nome || ""} vinculado em ${roomName}.`);
     } catch (error) {
       showToast("Erro ao vincular patrimônio na sala: " + error.message, "error");
+    }
+  }
+
+  async function deleteSelectedRoom() {
+    if (!selectedRoomId) {
+      showToast("Selecione uma sala para excluir.", "error");
+      return;
+    }
+
+    const room = cachedRooms.find(item => item.id === selectedRoomId);
+    if (!room) {
+      showToast("Sala não encontrada para exclusão.", "error");
+      return;
+    }
+
+    const roomName = getRoomDisplayName(room);
+    const confirmed = window.confirm(`Tem certeza que deseja excluir a sala ${roomName}? Os vínculos com patrimônios serão removidos.`);
+    if (!confirmed) return;
+
+    try {
+      const roomId = selectedRoomId;
+      const assignments = cachedRoomAssignments[roomId] || {};
+      const updates = {};
+
+      updates[`salas/${roomId}`] = null;
+
+      Object.keys(assignments).forEach(assetId => {
+        updates[`salas_patrimonios/${roomId}/${assetId}`] = null;
+        updates[`patrimonios/${assetId}/sala_id`] = null;
+        updates[`patrimonios/${assetId}/sala_nome`] = null;
+        updates[`patrimonios/${assetId}/atualizado_em`] = new Date().toISOString();
+      });
+
+      await database.ref().update(updates);
+      selectedRoomId = null;
+      showToast(`Sala ${roomName} excluída com sucesso.`);
+    } catch (error) {
+      showToast("Erro ao excluir sala: " + error.message, "error");
     }
   }
 
@@ -1543,6 +1723,23 @@
     }
   }
 
+  async function deleteHistoryMovement(movementId) {
+    if (!movementId) {
+      showToast("Movimentação inválida para exclusão.", "error");
+      return;
+    }
+
+    const confirmed = window.confirm("Tem certeza que deseja excluir este registro do histórico?");
+    if (!confirmed) return;
+
+    try {
+      await database.ref(`movimentacoes/${movementId}`).remove();
+      showToast("Registro do histórico excluído com sucesso.");
+    } catch (error) {
+      showToast("Erro ao excluir registro do histórico: " + error.message, "error");
+    }
+  }
+
   async function confirmMovement(tipo) {
     if (!latestReading || !latestReadingKey) {
       showToast("Nenhuma leitura pendente para confirmar.", "error");
@@ -1665,7 +1862,7 @@
         <td>${item.uid_tag || "--"}</td>
         <td>${item.confirmado_por_nome || "--"}</td>
         <td>${item.localizacao_resultante || "--"}</td>
-        <td>${item.patrimonio_id ? `<div class="row"><button class="btn-edit btn-small" onclick="editAsset('${item.patrimonio_id}')">Editar</button><button class="btn-danger btn-small" onclick="deleteAsset('${item.patrimonio_id}')">Excluir</button></div>` : "--"}</td>
+        <td>${item.patrimonio_id ? `<div class="row"><button class="btn-edit btn-small" onclick="editAsset('${item.patrimonio_id}')">Editar</button>${item.id ? `<button class="btn-danger btn-small" onclick="deleteHistoryMovement('${item.id}')">Excluir histórico</button>` : ""}</div>` : (item.id ? `<button class="btn-danger btn-small" onclick="deleteHistoryMovement('${item.id}')">Excluir histórico</button>` : "--")}</td>
       `;
       tbody.appendChild(tr);
     });
@@ -1739,9 +1936,18 @@
       renderRoomsTable();
     });
 
-    database.ref("movimentacoes").limitToLast(100).on("value", snapshot => {
+    database.ref("movimentacoes").on("value", snapshot => {
       const items = [];
-      snapshot.forEach(child => items.push(child.val()));
+      snapshot.forEach(child => {
+        const movement = child.val() || {};
+        if (!movement.patrimonio_id && !movement.patrimonio_nome && !movement.patrimonio_codigo) {
+          return;
+        }
+        items.push({
+          ...movement,
+          id: child.key
+        });
+      });
       items.sort((a, b) => (b.confirmado_em_unix || 0) - (a.confirmado_em_unix || 0));
       renderHistory(items);
 
